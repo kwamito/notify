@@ -1,5 +1,5 @@
 **Notify**
-This is a django app that makes it easy for students and 
+This is a django API that makes it easy for students and 
 workers to make notes and either make them public or private
 
 Users can create texts will be rendered in markdown
