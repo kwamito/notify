@@ -5,10 +5,12 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.dispatch import receiver
 from rest_framework.authtoken.models import Token
 from notes.models import Note
+from django.core.exceptions import ValidationError
 
 
 # Create your models here.
@@ -60,6 +62,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     def get_absolute_url(self):
         return "users/%i/" % (self.pk)
 
+    def profile_image(self):
+        profile_image = Profile.objects.get(user__email=self.email)
+        return profile_image.image_url
+
     def tokens(self):
         return ""
 
@@ -80,6 +86,31 @@ class Profile(models.Model):
         notes_count = Note.objects.filter(author=self.user)
         notes_count = notes_count.count()
         return notes_count
+
+    def followers_count(self):
+        followers_counts = Follow.objects.filter(following=self.user)
+        return followers_counts.count()
+
+
+class Follow(models.Model):
+    follower = models.ForeignKey(User, models.CASCADE, related_name="follow_request")
+    following = models.ForeignKey(User, models.CASCADE, related_name="followers")
+    created = models.DateTimeField(default=timezone.now())
+
+    def __str__(self):
+        return "User: {} is following {}".format(
+            self.follower.email, self.following.email
+        )
+
+    def followers_count(self):
+        followers_counts = Follow.objects.filter(following=self.following)
+        followers_counts = followers_counts.count()
+        return followers_counts
+
+    def save(self, *args, **kwargs):
+        if self.following == self.follower:
+            raise ValidationError("Users cannot follow themselves")
+        super(Follow, self).save(*args, **kwargs)
 
 
 @receiver(models.signals.post_save, sender=settings.AUTH_USER_MODEL)
