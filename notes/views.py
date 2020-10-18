@@ -19,7 +19,7 @@ class NotesList(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Note.objects.filter(author=user)
+        return Note.objects.filter(author=user).order_by("-created_at")
 
     def perform_create(self, serializer):
         user = self.request.user
@@ -42,7 +42,12 @@ class DetailUpdateDeletNote(APIView):
     def delete(self, request, pk, format=None):
         note = self.get_object(pk)
         note.delete()
-        return Response(status=status.HTTP_202_ACCEPTED)
+        user = request.user
+        notes = Note.objects.filter(author=user).order_by("-created_at")
+        serializer = NoteSerializer(data=notes)
+        if serializer.is_valid():
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        return Response(serializer.data)
 
 
 class SearchNote(APIView):

@@ -3,6 +3,8 @@ import datetime
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from datetime import datetime
+from .time import determine_time
 
 
 # Create your models here.
@@ -22,8 +24,12 @@ class Note(models.Model):
 
     colour = models.CharField(choices=COLOURS, max_length=25, default="#C0C0C0")
     created_at = models.DateTimeField(auto_now_add=True)
+    is_private = models.BooleanField(default=False, null=True, blank=True)
 
     def all_users_notes_count(self):
         filtered_notes = Note.objects.filter(author=self.author)
         notes_count = filtered_notes.count()
         return notes_count
+
+    def timer(self):
+        return determine_time(self.created_at)

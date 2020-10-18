@@ -4,15 +4,25 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
+from django.db.models import Q
+import json
+from rest_framework.decorators import api_view
 from rest_framework import mixins, generics
 from django.http import HttpResponse, JsonResponse
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .serializers import UserSerializer, UserValidateSerializer, ProfileSerializer
+from .serializers import (
+    UserSerializer,
+    UserValidateSerializer,
+    ProfileSerializer,
+    FollowSerializer,
+    ProfileFollowSerializer,
+)
 from rest_framework import status
-from .models import User, Profile
+from .models import User, Profile, Follow
 from django.http import Http404
 from django.contrib.auth.hashers import check_password
+from django.core.exceptions import ValidationError
 
 
 # Create your views here.
@@ -89,7 +99,11 @@ class ProfileApiView(APIView):
     def get(self, request, format=None):
         user = request.user
         profile = self.get_object(user)
+        # followers = Follow.objects.filter(following=request.user)
         serializer = ProfileSerializer(profile)
+        # followers_serializer = FollowSerializer(followers, many=True)
+        # data = serializer.data + followers_serializer.data
+        # data = json.dumps(data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request, format=None):
@@ -100,3 +114,74 @@ class ProfileApiView(APIView):
             serializer.update(instance=profile, validated_data=request.data)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FollowerAPIView(APIView):
+    def get(self, request, format=None):
+        user = request.user
+        followers = Follow.objects.filter(following=user)
+        serializer = FollowSerializer(followers, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, format=None):
+        user = request.user
+        user_id = request.data["id"]
+        user_to_follow = User.objects.get(id=int(user_id))
+        try:
+            Follow.objects.get(follower=request.user, following=user_to_follow)
+        except Follow.DoesNotExist:
+            try:
+                data = Follow.objects.create(
+                    follower=request.user, following=user_to_follow
+                )
+            except ValidationError:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            serializer = FollowSerializer(data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class Followers(generics.ListAPIView):
+    serializer_class = FollowSerializer
+
+    def get_queryset(self):
+        queryset = Follow.objects.filter(following=self.request.user.id)
+        return queryset
+
+
+@api_view(["GET", "POST"])
+def search(request, search):
+    if request.method == "GET":
+        users_by_search = User.objects.filter(Q(email__icontains=search))
+        serializer = UserSerializer(users_by_search, many=True)
+        return Response(serializer.data)
+    # else:
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == "POST":
+        user = request.user
+        following_id = request.data["id"]
+        user_to_follow = User.objects.get(id=int(following_id))
+        try:
+            Follow.objects.get(follower=request.user, following=user_to_follow)
+        except Follow.DoesNotExist:
+            if user_to_follow == request.user:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+            else:
+                data = Follow.objects.create(
+                    follower=request.user, following=user_to_follow
+                )
+
+        serializer = FollowSerializer(data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# def profile_follow_view(request):
+#     followers = Follow.objects.filter(following=request.user)
+#     profile = Profile.objects.get(user=request.user)
+#     both = {followers, profile}
+#     print(both)
+#     serializer = ProfileFollowSerializer(data=both, many=True)
+#     if serializer.is_valid():
+#         return Response(serializer.data)

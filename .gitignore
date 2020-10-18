@@ -2,3 +2,5 @@ env
 .env
 db.sqlite3
 .vscode
+users/migrations
+migrations

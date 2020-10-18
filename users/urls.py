@@ -11,4 +11,6 @@ urlpatterns = [
     path("api-login/", obtain_auth_token, name="api-login"),
     path("login/", views.LoginApiView.as_view(), name="login"),
     path("profile/", views.ProfileApiView.as_view(), name="profile-api"),
+    path("followers", views.FollowerAPIView.as_view(), name="follower"),
+    path("search/<str:search>", views.search, name="user-search"),
 ]
